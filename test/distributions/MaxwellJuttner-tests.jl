@@ -10,3 +10,12 @@ end
         @test χrel ≈ χcoldish rtol = 1.0e-3
     end
 end
+
+@testitem "Maxwell-Juttner Bessel K stays exact at large |z|" begin
+    using SpecialFunctions: besselkx
+    kx = VlasovMaxwellDispersion._besselkx
+    for ν in (2, 3), z in (150.0 + 40im, 1.0e7 + 1.0e6im, 1.0e9)
+        @test kx(ν, z) ≈ besselkx(ν, z) rtol = 1.0e-14
+    end
+    @test kx(2, 1.0e12) ≈ sqrt(π / 2.0e12) * (1 + 15 / 8.0e12)  # AMOS throws here
+end

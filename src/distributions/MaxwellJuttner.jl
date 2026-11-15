@@ -20,7 +20,7 @@ function contribution(d::Juttner, s, ω, k; kwargs...)
     if imag(ω) < 0 && iszero(kz)
         throw(ArgumentError("MaxwellJuttner with imag(ω)<0 and kz=0 needs Landau contour continuation"))
     end
-    invK2μ = inv(besselkx(2, μ))
+    invK2μ = inv(_besselkx(2, μ))
     # near-marginal layer (|Im ω| ≤ 1e-4|Ω|) stays on the straight integral: it
     # approximates the physical boundary value to O(Im ω), where the continued
     # sheet is exponentially far away (see _mj_parallel_superluminal_integral)
@@ -72,9 +72,22 @@ function _maxwell_juttner_integrand(ξ, μ, invK2μ, ω, Ω, kz, kperp)
 end
 
 
-@inline function _besselk_ratio(ν, sqrtR, μ, invK2μ)
-    Kν = abs(sqrtR) > 1.0e6 ? sqrt(π / (2sqrtR)) : besselkx(ν, sqrtR)
-    return exp(μ - sqrtR) * Kν * invK2μ
+@inline _besselk_ratio(ν, sqrtR, μ, invK2μ) = exp(μ - sqrtR) * _besselkx(ν, sqrtR) * invK2μ
+
+# e^z K_ν(z) for Re z ≥ 0. From |z| = 100 its large-|z| asymptotic series, summed to eps, is exact and faster
+# than AMOS, which throws for |z| ≳ 1e10.
+function _besselkx(ν, z)
+    abs(z) < 100 && return besselkx(ν, z)
+    T = real(float(typeof(z)))
+    μ = 4 * T(ν)^2
+    s = t = one(float(z))
+    k = 0
+    while abs(t) > eps(T) * abs(s)
+        k += 1
+        t *= (μ - (2k - 1)^2) / (8k * z)
+        s += t
+    end
+    return sqrt(T(π) / 2z) * s
 end
 
 # At parallel damped-superluminal k, the straight ξ-integral is not the
@@ -136,7 +149,7 @@ function _mj_J_component(s, μ, invK2μ, ω, aΩ, kz, flip, j, q, ν)
     sqrtR = flip * sqrt(A) * sqrt(B) / aΩ
     R = A * B / aΩ^2
     E = exp(μ - sqrtR + im * j * s) * s^q
-    Kx = abs(sqrtR) > 1.0e6 ? sqrt(π / (2sqrtR)) : besselkx(ν, sqrtR)
+    Kx = _besselkx(ν, sqrtR)
     return E * Kx * sqrtR^(2 - ν) / R * invK2μ
 end
 
